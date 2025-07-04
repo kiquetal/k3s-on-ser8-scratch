@@ -1,4 +1,4 @@
-# K3s on Ser8 - Setup Guide
+# K3s on Ser8 with Omakub OS - Setup Guide
 
 ## 1. Obtaining the Operating System
 
@@ -60,7 +60,20 @@ sudo dd if=omakub-latest.iso of=/dev/rdiskN bs=1m
 - `of=/dev/rdiskN`: Output file - raw disk device (faster than /dev/diskN)
 - `bs=1m`: Block size of 1 megabyte (macOS uses lowercase 'm')
 
-## 3. Setting Up a User on Ser8
+## 3. Installing Omakub OS on Ser8
+
+1. Insert the bootable USB drive into your Ser8 device
+2. Power on Ser8 and enter the BIOS/UEFI (usually by pressing F2, DEL, or ESC during startup)
+3. Set the USB drive as the first boot device
+4. Save and exit the BIOS/UEFI
+5. When the Omakub installer appears, follow the on-screen instructions
+6. Select your preferred language, time zone, and keyboard layout
+7. When prompted for installation type, choose "Install Omakub OS"
+8. Create a partition scheme (recommended: use the guided partitioning option)
+9. Complete the installation process and reboot when prompted
+10. Remove the USB drive during reboot
+
+## 4. Setting Up a User on Ser8
 
 After installing Omakub OS on Ser8, create a dedicated user:
 
@@ -91,7 +104,7 @@ After installing Omakub OS on Ser8, create a dedicated user:
    chmod 600 ~/.ssh/authorized_keys
    ```
 
-## 4. Creating SSH Key-Pair from Remote Machine
+## 5. Creating SSH Key-Pair from Remote Machine
 
 To securely connect to Ser8 from your remote machine:
 
@@ -127,41 +140,34 @@ To securely connect to Ser8 from your remote machine:
    sudo systemctl restart sshd
    ```
 
-## 5. K3s Installation
+## 6. K3s Installation
 
-For K3s installation, we'll use Ansible. Please refer to the `ansible/` directory for detailed instructions and playbooks.
+For K3s installation on Omakub OS, we'll use Ansible. Please refer to the `ansible/` directory for detailed instructions and playbooks.
 
 ## Additional Resources
 
-### Installing Omakub
+### Managing Omakub OS
 
-Omakub can be installed from their official website. Follow these steps to install Omakub:
+Omakub OS includes several tools to help manage your system:
 
-1. Visit the official Omakub website at [https://omakub.io/downloads](https://omakub.io/downloads)
-
-2. Select the Linux distribution package compatible with Ser8 (typically the Debian/Ubuntu package)
-
-3. Download the package using:
+1. System updates:
    ```bash
-   wget https://omakub.io/downloads/omakub_latest_amd64.deb
+   sudo omakub-update
    ```
 
-4. Install the package:
+2. Package management:
    ```bash
-   sudo dpkg -i omakub_latest_amd64.deb
+   sudo omakub-pkg install <package-name>
+   sudo omakub-pkg remove <package-name>
+   sudo omakub-pkg list
    ```
 
-5. If there are dependency issues, resolve them with:
+3. System monitoring:
    ```bash
-   sudo apt --fix-broken install -y
+   omakub-monitor
    ```
 
-6. Verify the installation:
-   ```bash
-   omakub version
-   ```
-
-7. Configure Omakub to work with your K3s installation:
+4. Configure Omakub to work with your K3s installation:
    ```bash
    sudo omakub setup --k3s-kubeconfig /etc/rancher/k3s/k3s.yaml
    ```
@@ -172,3 +178,4 @@ If you encounter any issues during the setup process, check the following:
 - System logs: `journalctl -xe`
 - K3s logs: `sudo journalctl -u k3s`
 - Omakub logs: `sudo journalctl -u omakub`
+- Omakub system diagnostics: `sudo omakub-diag`
