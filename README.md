@@ -69,7 +69,35 @@ sudo dd if=omakub-latest.iso of=/dev/rdiskN bs=1m
 5. When the Omakub installer appears, follow the on-screen instructions
 6. Select your preferred language, time zone, and keyboard layout
 7. When prompted for installation type, choose "Install Omakub OS"
-8. Create a partition scheme (recommended: use the guided partitioning option)
+8. At the partitioning step, select "Manual partitioning" for optimal Kubernetes and Docker performance
+
+### 3.1 Recommended Partition Scheme for K8s and Docker
+
+When manually partitioning the disk, follow these recommendations:
+
+| Partition | Mount Point | File System | Size | Purpose |
+|-----------|-------------|------------|------|---------|
+| /dev/sda1 | /boot/efi  | FAT32      | 512 MB | EFI System Partition |
+| /dev/sda2 | /boot      | ext4       | 1 GB   | Boot files |
+| /dev/sda3 | /          | ext4       | 40 GB  | Root filesystem |
+| /dev/sda4 | /var       | ext4       | 30 GB  | Variable data (logs, cache) |
+| /dev/sda5 | /var/lib/docker | ext4  | 60-100 GB | Docker storage |
+| /dev/sda6 | /var/lib/rancher | ext4 | 30-50 GB | K3s data |
+| /dev/sda7 | swap       | swap       | 8 GB   | Swap space |
+
+#### Partition Rationale
+
+- **Separate /var partition**: Prevents logs and temporary files from filling the root partition
+- **Dedicated Docker storage**: Isolates container images and volumes for better performance
+- **Dedicated K3s storage**: Isolates Kubernetes data for better performance
+- **Appropriate sizing**: Ensures adequate space for container images and Kubernetes components
+
+#### Performance Considerations
+
+- For SSDs, add the `noatime` mount option to reduce unnecessary write operations
+- If using an NVMe drive, consider using the `ext4` file system with `discard=async` for better performance
+- For mechanical HDDs, consider setting up an SSD cache for `/var/lib/docker` to improve container startup times
+
 9. Complete the installation process and reboot when prompted
 10. Remove the USB drive during reboot
 
