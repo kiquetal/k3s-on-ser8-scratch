@@ -4,20 +4,20 @@
 
 Before setting up Ser8, you need to obtain the appropriate operating system:
 
-1. Visit the official Ubuntu Server download page at [https://ubuntu.com/download/server](https://ubuntu.com/download/server)
+1. Visit the official Omakub download page at [https://omakub.org/download](https://omakub.org/download)
 
-2. Download the latest LTS version (Ubuntu 24.04 LTS as of July 2025)
+2. Download the latest stable version of Omakub OS
 
 3. Verify the ISO image integrity using the SHA256 checksums provided on the download page:
    ```bash
-   sha256sum ubuntu-24.04-live-server-amd64.iso
+   sha256sum omakub-latest.iso
    ```
 
 4. Compare the output with the official checksum to ensure the ISO hasn't been corrupted.
 
 ## 2. Creating a Bootable USB
 
-To install the OS on Ser8, create a bootable USB drive:
+To install Omakub OS on Ser8, create a bootable USB drive:
 
 ### For Linux Users:
 ```bash
@@ -25,15 +25,23 @@ To install the OS on Ser8, create a bootable USB drive:
 lsblk
 
 # Write the ISO to the USB drive (replace /dev/sdX with your USB device)
-sudo dd bs=4M if=ubuntu-24.04-live-server-amd64.iso of=/dev/sdX conv=fdatasync status=progress
+sudo dd bs=4M if=omakub-latest.iso of=/dev/sdX conv=fsync status=progress
 ```
+
+#### DD Command Parameters Explained:
+- `bs=4M`: Sets the block size to 4 megabytes, optimizing transfer speed
+- `if=omakub-latest.iso`: Input file - path to the Omakub ISO
+- `of=/dev/sdX`: Output file - destination USB drive (replace X with your device letter)
+- `conv=fsync`: Forces synchronized I/O to ensure all data is written before command completion
+- `status=progress`: Shows real-time progress of the operation
 
 ### For Windows Users:
 1. Download and install Rufus from [https://rufus.ie](https://rufus.ie)
 2. Insert your USB drive
 3. Open Rufus and select your USB drive
-4. Click on SELECT and choose the Ubuntu ISO
-5. Click START and wait for the process to complete
+4. Click on SELECT and choose the Omakub ISO
+5. In the "Image option" dropdown, select "Write in DD Image mode"
+6. Click START and wait for the process to complete
 
 ### For macOS Users:
 ```bash
@@ -44,12 +52,17 @@ diskutil list
 diskutil unmountDisk /dev/diskN
 
 # Write the ISO to the USB drive
-sudo dd if=ubuntu-24.04-live-server-amd64.iso of=/dev/rdiskN bs=1m
+sudo dd if=omakub-latest.iso of=/dev/rdiskN bs=1m
 ```
+
+#### MacOS DD Parameters Explained:
+- `if=omakub-latest.iso`: Input file - path to the Omakub ISO
+- `of=/dev/rdiskN`: Output file - raw disk device (faster than /dev/diskN)
+- `bs=1m`: Block size of 1 megabyte (macOS uses lowercase 'm')
 
 ## 3. Setting Up a User on Ser8
 
-After installing the OS on Ser8, create a dedicated user:
+After installing Omakub OS on Ser8, create a dedicated user:
 
 1. Create a new user on Ser8:
    ```bash
