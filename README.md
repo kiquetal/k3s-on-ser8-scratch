@@ -1,38 +1,126 @@
 # K3s on Ser8 - Setup Guide
 
-## First-time Setup on Ser8
+## 1. Obtaining the Operating System
 
-This section provides instructions for setting up K3s on the Ser8 system for the first time.
+Before setting up Ser8, you need to obtain the appropriate operating system:
 
-### Prerequisites
+1. Visit the official Ubuntu Server download page at [https://ubuntu.com/download/server](https://ubuntu.com/download/server)
 
-- Access to Ser8 system
-- Administrator privileges
-- Basic knowledge of Linux commands
+2. Download the latest LTS version (Ubuntu 24.04 LTS as of July 2025)
 
-### Installation Steps
-
-1. Update the system packages:
+3. Verify the ISO image integrity using the SHA256 checksums provided on the download page:
    ```bash
-   sudo apt update && sudo apt upgrade -y
+   sha256sum ubuntu-24.04-live-server-amd64.iso
    ```
 
-2. Install required dependencies:
+4. Compare the output with the official checksum to ensure the ISO hasn't been corrupted.
+
+## 2. Creating a Bootable USB
+
+To install the OS on Ser8, create a bootable USB drive:
+
+### For Linux Users:
+```bash
+# Identify your USB drive
+lsblk
+
+# Write the ISO to the USB drive (replace /dev/sdX with your USB device)
+sudo dd bs=4M if=ubuntu-24.04-live-server-amd64.iso of=/dev/sdX conv=fdatasync status=progress
+```
+
+### For Windows Users:
+1. Download and install Rufus from [https://rufus.ie](https://rufus.ie)
+2. Insert your USB drive
+3. Open Rufus and select your USB drive
+4. Click on SELECT and choose the Ubuntu ISO
+5. Click START and wait for the process to complete
+
+### For macOS Users:
+```bash
+# Identify your USB drive
+diskutil list
+
+# Unmount the USB drive (replace N with your disk number)
+diskutil unmountDisk /dev/diskN
+
+# Write the ISO to the USB drive
+sudo dd if=ubuntu-24.04-live-server-amd64.iso of=/dev/rdiskN bs=1m
+```
+
+## 3. Setting Up a User on Ser8
+
+After installing the OS on Ser8, create a dedicated user:
+
+1. Create a new user on Ser8:
    ```bash
-   sudo apt install -y curl openssh-server
+   sudo adduser k3sadmin
    ```
 
-3. Download and install K3s:
+2. Add the user to the sudo group for administrative privileges:
    ```bash
-   curl -sfL https://get.k3s.io | sh -
+   sudo usermod -aG sudo k3sadmin
    ```
 
-4. Verify the installation:
+3. Switch to the new user:
    ```bash
-   sudo kubectl get nodes
+   su - k3sadmin
    ```
 
-## Installing Omakub
+4. Create an SSH directory and set appropriate permissions:
+   ```bash
+   mkdir -p ~/.ssh
+   chmod 700 ~/.ssh
+   ```
+
+5. Create the authorized_keys file for storing your public key:
+   ```bash
+   touch ~/.ssh/authorized_keys
+   chmod 600 ~/.ssh/authorized_keys
+   ```
+
+## 4. Creating SSH Key-Pair from Remote Machine
+
+To securely connect to Ser8 from your remote machine:
+
+1. On your remote machine (laptop/desktop), generate an SSH key pair:
+   ```bash
+   ssh-keygen -t ed25519 -C "your_email@example.com"
+   ```
+
+2. Copy your public key to Ser8:
+   ```bash
+   ssh-copy-id k3sadmin@ser8-hostname
+   ```
+   Alternatively, copy the content of your `~/.ssh/id_ed25519.pub` file and manually add it to the `~/.ssh/authorized_keys` file on Ser8.
+
+3. Test the connection from your remote machine:
+   ```bash
+   ssh k3sadmin@ser8-hostname
+   ```
+
+4. For additional security, configure SSH on Ser8 to disable password authentication:
+   ```bash
+   sudo nano /etc/ssh/sshd_config
+   ```
+   
+   Change/add the following lines:
+   ```
+   PasswordAuthentication no
+   PubkeyAuthentication yes
+   ```
+
+5. Restart the SSH service:
+   ```bash
+   sudo systemctl restart sshd
+   ```
+
+## 5. K3s Installation
+
+For K3s installation, we'll use Ansible. Please refer to the `ansible/` directory for detailed instructions and playbooks.
+
+## Additional Resources
+
+### Installing Omakub
 
 Omakub can be installed from their official website. Follow these steps to install Omakub:
 
@@ -65,63 +153,7 @@ Omakub can be installed from their official website. Follow these steps to insta
    sudo omakub setup --k3s-kubeconfig /etc/rancher/k3s/k3s.yaml
    ```
 
-## Creating an SSH User for Remote Access
-
-To connect to Ser8 from your laptop, follow these steps to create a dedicated SSH user:
-
-1. Create a new user on Ser8:
-   ```bash
-   sudo adduser k3sadmin
-   ```
-
-2. Add the user to the sudo group for administrative privileges:
-   ```bash
-   sudo usermod -aG sudo k3sadmin
-   ```
-
-3. Switch to the new user:
-   ```bash
-   su - k3sadmin
-   ```
-
-4. Create an SSH directory and set appropriate permissions:
-   ```bash
-   mkdir -p ~/.ssh
-   chmod 700 ~/.ssh
-   ```
-
-5. Create the authorized_keys file for storing your public key:
-   ```bash
-   touch ~/.ssh/authorized_keys
-   chmod 600 ~/.ssh/authorized_keys
-   ```
-
-6. On your laptop, generate an SSH key pair if you don't already have one:
-   ```bash
-   ssh-keygen -t ed25519 -C "your_email@example.com"
-   ```
-
-7. Copy your laptop's public key to the server:
-   ```bash
-   ssh-copy-id k3sadmin@ser8-hostname
-   ```
-   Alternatively, manually add the public key to `~/.ssh/authorized_keys` on the server.
-
-8. Test the connection from your laptop:
-   ```bash
-   ssh k3sadmin@ser8-hostname
-   ```
-
-9. For additional security, consider configuring SSH to disable password authentication and use only key-based authentication.
-
-## Next Steps
-
-After completing the above setup, you can proceed to:
-- Deploy applications on your K3s cluster
-- Configure networking and storage
-- Set up monitoring and logging
-
-## Troubleshooting
+### Troubleshooting
 
 If you encounter any issues during the setup process, check the following:
 - System logs: `journalctl -xe`
