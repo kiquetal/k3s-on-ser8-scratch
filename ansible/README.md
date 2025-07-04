@@ -1,6 +1,6 @@
-# Ansible Setup for K3s and Docker on Ser8
+# Ansible Setup for K3s and Docker on Ser8 with Omakub OS
 
-This directory contains Ansible playbooks and roles for setting up K3s and Docker on your Ser8 device. The setup allows for remote Docker usage from IntelliJ IDEA.
+This directory contains Ansible playbooks and roles for setting up K3s and Docker on your Ser8 device running Omakub OS. The setup allows for remote Docker usage from IntelliJ IDEA.
 
 ## Directory Structure
 
@@ -19,7 +19,7 @@ ansible/
 
 1. Ansible installed on your control machine:
    ```bash
-   # For Ubuntu/Debian
+   # For Omakub OS / Debian-based systems
    sudo apt update
    sudo apt install ansible
 
@@ -28,6 +28,7 @@ ansible/
    ```
 
 2. SSH access to your Ser8 device configured as described in the main README.md
+   (Omakub OS uses OpenSSH server with the same configuration approach as described)
 
 ## Setup Instructions
 
@@ -53,10 +54,10 @@ ansible-playbook -i inventory.yml k3s-docker-setup.yml
 ```
 
 This playbook will:
-- Install K3s as a single-node Kubernetes cluster
+- Install K3s as a single-node Kubernetes cluster on Omakub OS
 - Install Docker and configure it for remote access
 - Set up TLS certificates for secure Docker remote connections
-- Configure necessary firewall rules
+- Configure necessary firewall rules for Omakub OS
 
 ### 3. Connect IntelliJ IDEA to Remote Docker
 
@@ -106,8 +107,14 @@ If you encounter issues:
           -H tcp://ser8-hostname:2376 info
    ```
 
-3. Check service status on Ser8:
+3. Check service status on Ser8 (Omakub OS uses systemd):
    ```bash
    ssh k3sadmin@ser8-hostname "sudo systemctl status k3s"
    ssh k3sadmin@ser8-hostname "sudo systemctl status docker"
+   ```
+
+4. Check Omakub OS-specific logs:
+   ```bash
+   ssh k3sadmin@ser8-hostname "sudo journalctl -xe | grep -i docker"
+   ssh k3sadmin@ser8-hostname "sudo journalctl -xe | grep -i k3s"
    ```
