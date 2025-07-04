@@ -1,0 +1,13 @@
+---
+# Default variables for K3s installation
+k3s_version: "v1.28.6+k3s1"
+k3s_token: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+k3s_server_args:
+  - "--disable=traefik"
+  - "--disable=servicelb"
+  - "--tls-san={{ ansible_host }}"
+k3s_install_dir: "/usr/local/bin"
+k3s_kubeconfig_path: "/etc/rancher/k3s/k3s.yaml"
+k3s_kubeconfig_mode: "0644"  # Allows non-root access
+k3s_use_docker: true
+

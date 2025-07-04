@@ -1,0 +1,12 @@
+---
+- name: Set up K3s and Docker for remote access
+  hosts: ser8
+  become: true
+  roles:
+    - role: docker
+      tags: [docker]
+    - role: remote-docker
+      tags: [docker, remote]
+    - role: k3s
+      tags: [k3s]
+

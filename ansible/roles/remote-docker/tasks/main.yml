@@ -1,0 +1,147 @@
+---
+- name: Ensure OpenSSL is installed
+  apt:
+    name: openssl
+    state: present
+
+- name: Create Docker certificates directory
+  file:
+    path: "{{ remote_docker_cert_path }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0700'
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Generate CA private key
+  openssl_privatekey:
+    path: "{{ remote_docker_cert_path }}/ca-key.pem"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Generate CA certificate
+  openssl_certificate:
+    path: "{{ remote_docker_cert_path }}/ca.pem"
+    privatekey_path: "{{ remote_docker_cert_path }}/ca-key.pem"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ remote_docker_ca_valid_days }}d"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+    countryName: "{{ remote_docker_country }}"
+    stateOrProvinceName: "{{ remote_docker_state }}"
+    localityName: "{{ remote_docker_locality }}"
+    organizationName: "{{ remote_docker_organization }}"
+    commonName: "CA"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Generate server private key
+  openssl_privatekey:
+    path: "{{ remote_docker_cert_path }}/server-key.pem"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Generate server certificate signing request
+  openssl_csr:
+    path: "{{ remote_docker_cert_path }}/server.csr"
+    privatekey_path: "{{ remote_docker_cert_path }}/server-key.pem"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+    countryName: "{{ remote_docker_country }}"
+    stateOrProvinceName: "{{ remote_docker_state }}"
+    localityName: "{{ remote_docker_locality }}"
+    organizationName: "{{ remote_docker_organization }}"
+    commonName: "{{ remote_docker_cname }}"
+    subjectAltName: "DNS:{{ remote_docker_cname }},IP:{{ ansible_host }}"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Generate server certificate
+  openssl_certificate:
+    path: "{{ remote_docker_cert_path }}/server-cert.pem"
+    csr_path: "{{ remote_docker_cert_path }}/server.csr"
+    provider: ownca
+    ownca_path: "{{ remote_docker_cert_path }}/ca.pem"
+    ownca_privatekey_path: "{{ remote_docker_cert_path }}/ca-key.pem"
+    ownca_not_after: "+{{ remote_docker_cert_valid_days }}d"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Generate client private key
+  openssl_privatekey:
+    path: "{{ remote_docker_cert_path }}/key.pem"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Generate client certificate signing request
+  openssl_csr:
+    path: "{{ remote_docker_cert_path }}/client.csr"
+    privatekey_path: "{{ remote_docker_cert_path }}/key.pem"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+    countryName: "{{ remote_docker_country }}"
+    stateOrProvinceName: "{{ remote_docker_state }}"
+    localityName: "{{ remote_docker_locality }}"
+    organizationName: "{{ remote_docker_organization }}"
+    commonName: "client"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Generate client certificate
+  openssl_certificate:
+    path: "{{ remote_docker_cert_path }}/cert.pem"
+    csr_path: "{{ remote_docker_cert_path }}/client.csr"
+    provider: ownca
+    ownca_path: "{{ remote_docker_cert_path }}/ca.pem"
+    ownca_privatekey_path: "{{ remote_docker_cert_path }}/ca-key.pem"
+    ownca_not_after: "+{{ remote_docker_cert_valid_days }}d"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Copy certificates to Docker configuration directory
+  copy:
+    src: "{{ remote_docker_cert_path }}/{{ item.src }}"
+    dest: "/etc/docker/{{ item.dest }}"
+    mode: '0644'
+    remote_src: yes
+  loop:
+    - { src: "ca.pem", dest: "ca.pem" }
+    - { src: "server-cert.pem", dest: "server-cert.pem" }
+    - { src: "server-key.pem", dest: "server-key.pem" }
+  notify: restart docker
+
+- name: Open Docker TCP port in firewall
+  ufw:
+    rule: allow
+    port: "{{ remote_docker_port }}"
+    proto: tcp
+  when: ansible_os_family == "Debian"
+
+- name: Create docker client config file for user
+  template:
+    src: docker-config.json.j2
+    dest: "{{ remote_docker_cert_path }}/config.json"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  become: true
+  become_user: "{{ ansible_user }}"

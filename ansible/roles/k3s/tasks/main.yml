@@ -1,0 +1,49 @@
+---
+- name: Download K3s installation script
+  get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: '0755'
+    force: yes
+
+- name: Create K3s directory
+  file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: '0755'
+
+- name: Install K3s
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+    INSTALL_K3S_EXEC: "server {{ k3s_server_args | join(' ') }}"
+    K3S_TOKEN: "{{ k3s_token }}"
+    INSTALL_K3S_SKIP_ENABLE: "{{ k3s_skip_enable | default('false') }}"
+    INSTALL_K3S_BIN_DIR: "{{ k3s_install_dir }}"
+    INSTALL_K3S_SKIP_START: "{{ k3s_skip_start | default('false') }}"
+  command: /tmp/k3s-install.sh{% if k3s_use_docker %} --docker{% endif %}
+  args:
+    creates: "{{ k3s_install_dir }}/k3s"
+
+- name: Set kubeconfig file permissions
+  file:
+    path: "{{ k3s_kubeconfig_path }}"
+    mode: "{{ k3s_kubeconfig_mode }}"
+
+- name: Create .kube directory for {{ ansible_user }}
+  file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0700'
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Copy kubeconfig to user's home directory
+  copy:
+    src: "{{ k3s_kubeconfig_path }}"
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    remote_src: yes
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'

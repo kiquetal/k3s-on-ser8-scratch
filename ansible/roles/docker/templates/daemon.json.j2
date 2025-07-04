@@ -1,0 +1,12 @@
+{
+  {% if docker_insecure_registries | length > 0 %}
+  "insecure-registries": {{ docker_insecure_registries | to_json }},
+  {% endif %}
+  "hosts": {{ docker_daemon_options.hosts | to_json }},
+  "tls": {{ docker_daemon_options.tls | to_json }},
+  "tlsverify": {{ docker_daemon_options.tlsverify | to_json }},
+  "tlscacert": "{{ docker_daemon_options.tlscacert }}",
+  "tlscert": "{{ docker_daemon_options.tlscert }}",
+  "tlskey": "{{ docker_daemon_options.tlskey }}"
+}
+

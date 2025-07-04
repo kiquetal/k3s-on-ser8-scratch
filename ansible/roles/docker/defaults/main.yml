@@ -1,0 +1,16 @@
+---
+# Default variables for Docker installation
+docker_version: "latest"
+docker_users:
+  - "{{ ansible_user }}"
+docker_daemon_options:
+  hosts:
+    - "unix:///var/run/docker.sock"
+    - "tcp://0.0.0.0:2376"
+  tls: true
+  tlsverify: true
+  tlscacert: "/etc/docker/ca.pem"
+  tlscert: "/etc/docker/server-cert.pem"
+  tlskey: "/etc/docker/server-key.pem"
+docker_insecure_registries: []
+
