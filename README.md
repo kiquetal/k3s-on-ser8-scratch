@@ -339,20 +339,23 @@ The Beelink SER8 typically comes with NVMe storage (1TB in this configuration) a
    # Create root partition
    sudo parted -a optimal /dev/nvme0n1 mkpart "root" ext4 2GiB 82GiB
    
+   # Create home partition
+   sudo parted -a optimal /dev/nvme0n1 mkpart "home" ext4 82GiB 152GiB
+   
    # Create var partition
-   sudo parted -a optimal /dev/nvme0n1 mkpart "var" ext4 82GiB 152GiB
+   sudo parted -a optimal /dev/nvme0n1 mkpart "var" ext4 152GiB 222GiB
    
    # Create docker storage partition (larger for container images)
-   sudo parted -a optimal /dev/nvme0n1 mkpart "docker" ext4 152GiB 552GiB
+   sudo parted -a optimal /dev/nvme0n1 mkpart "docker" ext4 222GiB 622GiB
    
    # Create k3s data partition (larger for Kubernetes workloads)
-   sudo parted -a optimal /dev/nvme0n1 mkpart "k3s" ext4 552GiB 988GiB
+   sudo parted -a optimal /dev/nvme0n1 mkpart "k3s" ext4 622GiB 988GiB
    
    # Create swap partition (adjusted for 24GB RAM - using 12GB)
    sudo parted -a optimal /dev/nvme0n1 mkpart "swap" linux-swap 988GiB 100%
    ```
 
-   > **Note about partition sizes**: With a 1TB NVMe drive, we allocate more space to Docker (400GB) and K3s (436GB) partitions to accommodate large container images and Kubernetes workloads. The swap is sized to 12GB (half of RAM) which is appropriate for the SER8's 24GB RAM.
+   > **Note about partition sizes**: With a 1TB NVMe drive, we allocate space to Home (70GB), Docker (400GB) and K3s (366GB) partitions. The home partition provides a separate area for user data, making system reinstallations easier. The swap is sized to 12GB (half of RAM) which is appropriate for the SER8's 24GB RAM.
 
 5. **Verify the partition layout**:
    ```bash
@@ -370,17 +373,20 @@ The Beelink SER8 typically comes with NVMe storage (1TB in this configuration) a
    # Format root with optimizations
    sudo mkfs.ext4 -L root -O fast_commit,extent,dir_index /dev/nvme0n1p3
    
+   # Format home with optimizations
+   sudo mkfs.ext4 -L home -O fast_commit,extent,dir_index /dev/nvme0n1p4
+   
    # Format var with journal size optimization
-   sudo mkfs.ext4 -L var -O fast_commit,extent,dir_index -J size=64 /dev/nvme0n1p4
+   sudo mkfs.ext4 -L var -O fast_commit,extent,dir_index -J size=64 /dev/nvme0n1p5
    
    # Format docker with optimizations for containers
-   sudo mkfs.ext4 -L docker -i 8192 -I 256 -O fast_commit,extent,dir_index,64bit /dev/nvme0n1p5
+   sudo mkfs.ext4 -L docker -i 8192 -I 256 -O fast_commit,extent,dir_index,64bit /dev/nvme0n1p6
    
    # Format k3s with optimizations for Kubernetes
-   sudo mkfs.ext4 -L k3s -i 8192 -O fast_commit,extent,dir_index /dev/nvme0n1p6
+   sudo mkfs.ext4 -L k3s -i 8192 -O fast_commit,extent,dir_index /dev/nvme0n1p7
    
    # Create and enable swap
-   sudo mkswap -L swap /dev/nvme0n1p7
+   sudo mkswap -L swap /dev/nvme0n1p8
    ```
 
 7. **Mount partitions for installation**:
@@ -394,9 +400,10 @@ The Beelink SER8 typically comes with NVMe storage (1TB in this configuration) a
    # Mount other partitions with optimizations
    sudo mount -o defaults /dev/nvme0n1p1 /mnt/boot/efi
    sudo mount -o defaults,noatime /dev/nvme0n1p2 /mnt/boot
-   sudo mount -o defaults,noatime,discard=async /dev/nvme0n1p4 /mnt/var
-   sudo mount -o defaults,noatime,discard=async,nobarrier /dev/nvme0n1p5 /mnt/var/lib/docker
-   sudo mount -o defaults,noatime,discard=async /dev/nvme0n1p6 /mnt/var/lib/rancher
+   sudo mount -o defaults,noatime,discard=async /dev/nvme0n1p4 /mnt/home
+   sudo mount -o defaults,noatime,discard=async /dev/nvme0n1p5 /mnt/var
+   sudo mount -o defaults,noatime,discard=async,nobarrier /dev/nvme0n1p6 /mnt/var/lib/docker
+   sudo mount -o defaults,noatime,discard=async /dev/nvme0n1p7 /mnt/var/lib/rancher
    ```
 
 8. **Generate optimized fstab**:
@@ -408,10 +415,11 @@ The Beelink SER8 typically comes with NVMe storage (1TB in this configuration) a
    echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p1) /boot/efi vfat defaults 0 2" | sudo tee -a /mnt/etc/fstab
    echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p2) /boot ext4 defaults,noatime 0 2" | sudo tee -a /mnt/etc/fstab
    echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p3) / ext4 defaults,noatime,discard=async 0 1" | sudo tee -a /mnt/etc/fstab
-   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p4) /var ext4 defaults,noatime,discard=async 0 2" | sudo tee -a /mnt/etc/fstab
-   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p5) /var/lib/docker ext4 defaults,noatime,discard=async,nobarrier 0 2" | sudo tee -a /mnt/etc/fstab
-   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p6) /var/lib/rancher ext4 defaults,noatime,discard=async 0 2" | sudo tee -a /mnt/etc/fstab
-   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p7) none swap sw 0 0" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p4) /home ext4 defaults,noatime,discard=async 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p5) /var ext4 defaults,noatime,discard=async 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p6) /var/lib/docker ext4 defaults,noatime,discard=async,nobarrier 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p7) /var/lib/rancher ext4 defaults,noatime,discard=async 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme0n1p8) none swap sw 0 0" | sudo tee -a /mnt/etc/fstab
    ```
 
 9. **Continue with your standard installation process**:
@@ -441,7 +449,7 @@ After installation, apply these optimizations specifically designed for the Beel
 3. **Enable and configure the swap**:
    ```bash
    # Enable the swap
-   sudo swapon /dev/nvme0n1p7
+   sudo swapon /dev/nvme0n1p8
    
    # Optimize swap performance
    echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.d/99-sysctl.conf
