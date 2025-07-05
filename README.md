@@ -101,94 +101,191 @@ When manually partitioning the disk, follow these recommendations:
 9. Complete the installation process and reboot when prompted
 10. Remove the USB drive during reboot
 
-### 3.2 Step-by-Step Omakub Partitioning Guide
+### 3.2 Standard Linux Partitioning for Kubernetes
 
-Omakub OS provides a specialized partitioning tool that simplifies disk setup for Kubernetes and container workloads. Here's how to use it:
+To create an optimal partition layout for Kubernetes using standard Linux tools:
 
-1. **Launch Omakub Partitioning Tool**:
-   - During installation, when you reach the partitioning step, select "Manual Partitioning"
-   - Click on "Advanced Mode" to access the Omakub Disk Manager
+1. **Access a Terminal**:
+   - During installation, access a terminal using `Ctrl+Alt+F2`
+   - You may need to log in as the installer user (often "root" with no password)
 
-2. **Using the Omakub Disk Manager**:
-
-   a. **Select Target Disk**:
+2. **Identify Target Disk**:
    ```bash
-   # The tool will display available disks:
-   omakub-disk-manager --list-disks
-
-   # Select your target installation disk
-   omakub-disk-manager --select /dev/sda
+   # List available disks and identify your target installation disk
+   lsblk -o NAME,SIZE,MODEL,TRAN
+   fdisk -l
    ```
 
-   b. **Use the K8s Optimized Template**:
+3. **Create Partitions Using fdisk**:
    ```bash
-   # For Kubernetes and Docker optimized layout
-   omakub-disk-manager --apply-template k8s-server
+   # Start fdisk for your target disk (replace /dev/sda with your actual disk)
+   sudo fdisk /dev/sda
    ```
 
-   c. **Customize Partition Sizes** (if needed):
-   ```bash
-   # Syntax: omakub-disk-manager --resize <mount-point> <size-in-GB>
-   omakub-disk-manager --resize /var/lib/docker 80
-   omakub-disk-manager --resize /var/lib/rancher 40
+   In the fdisk interactive prompt:
+   ```
+   # Create new GPT partition table
+   g
+
+   # Create EFI partition
+   n
+   1
+   [press Enter for default]
+   +512M
+   t
+   1
+   ef
+
+   # Create boot partition
+   n
+   2
+   [press Enter for default]
+   +1G
+   
+   # Create root partition
+   n
+   3
+   [press Enter for default]
+   +40G
+
+   # Create /var partition
+   n
+   4
+   [press Enter for default]
+   +30G
+
+   # Create docker storage partition
+   n
+   5
+   [press Enter for default]
+   +80G
+
+   # Create k3s data partition
+   n
+   6
+   [press Enter for default]
+   +40G
+
+   # Create swap partition
+   n
+   7
+   [press Enter for default]
+   +8G
+   t
+   7
+   82
+
+   # Write changes and exit
+   w
    ```
 
-   d. **Apply SSD Optimizations** (if using SSD/NVMe):
+4. **Format Partitions**:
    ```bash
-   omakub-disk-manager --optimize ssd
+   # Format EFI partition
+   sudo mkfs.fat -F32 /dev/sda1
+
+   # Format boot partition
+   sudo mkfs.ext4 -L boot /dev/sda2
+
+   # Format root partition with optimizations for SSD/NVMe
+   sudo mkfs.ext4 -L root -O fast_commit,extent,dir_index /dev/sda3
+
+   # Format var partition
+   sudo mkfs.ext4 -L var -O fast_commit,extent,dir_index /dev/sda4
+
+   # Format docker storage with optimizations for containers
+   sudo mkfs.ext4 -L docker -i 8192 -I 256 -O fast_commit,extent,dir_index,64bit /dev/sda5
+
+   # Format k3s partition
+   sudo mkfs.ext4 -L k3s -O fast_commit,extent,dir_index /dev/sda6
+
+   # Set up swap
+   sudo mkswap -L swap /dev/sda7
    ```
 
-3. **Review Partition Layout**:
+5. **Mount for Installation**:
    ```bash
-   # Verify partition configuration before applying
-   omakub-disk-manager --show-plan
+   # Mount root filesystem
+   sudo mount /dev/sda3 /mnt
+
+   # Create mount points
+   sudo mkdir -p /mnt/{boot/efi,var,var/lib/docker,var/lib/rancher}
+
+   # Mount other partitions
+   sudo mount /dev/sda1 /mnt/boot/efi
+   sudo mount /dev/sda2 /mnt/boot
+   sudo mount /dev/sda4 /mnt/var
+   sudo mount /dev/sda5 /mnt/var/lib/docker
+   sudo mount /dev/sda6 /mnt/var/lib/rancher
    ```
 
-4. **Apply the Partition Configuration**:
+6. **Generate fstab for Optimized Mounts**:
    ```bash
-   # Execute the partitioning plan
-   omakub-disk-manager --apply
+   sudo mkdir -p /mnt/etc
+   sudo bash -c 'echo "# /etc/fstab: system mounts" > /mnt/etc/fstab'
+   
+   # Add entries with optimal mount options
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/sda1) /boot/efi vfat defaults 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/sda2) /boot ext4 defaults,noatime 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/sda3) / ext4 defaults,noatime,discard=async 0 1" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/sda4) /var ext4 defaults,noatime,discard=async 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/sda5) /var/lib/docker ext4 defaults,noatime,discard=async,nobarrier 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/sda6) /var/lib/rancher ext4 defaults,noatime,discard=async 0 2" | sudo tee -a /mnt/etc/fstab
+   echo "UUID=$(sudo blkid -s UUID -o value /dev/sda7) none swap sw 0 0" | sudo tee -a /mnt/etc/fstab
    ```
 
-#### Omakub GUI Partitioning
+7. **Continue Installation**:
+   - Return to the graphical installer with `Ctrl+Alt+F7`
+   - Direct the installer to use the mount points you've created
+   - Continue with the rest of the installation process
 
-If you prefer using the graphical interface:
+#### Verification of Partition Layout
 
-1. In the Omakub installer, select "Manual Partitioning"
-2. Click on "Omakub Disk Assistant"
-3. From the dropdown menu, select "Kubernetes Server Profile"
-4. The assistant will automatically create the recommended partition layout
-5. You can adjust partition sizes using the sliders
-6. Check the "Optimize for SSD" option if applicable
-7. Click "Apply" to confirm your partition layout
-
-#### Omakub Partition Verification
-
-After applying the partition layout, you can verify it using:
+After partitioning, verify your setup with:
 
 ```bash
-# From the installation environment
-omakub-verify-layout --profile=k8s
+# Check partition table
+sudo fdisk -l /dev/sda
 
-# This will check if your partitioning follows best practices for Kubernetes
+# Check filesystem types
+lsblk -f
+
+# Check mount options (after installation is complete)
+findmnt -t ext4,vfat
 ```
 
-The verification tool will provide feedback and optimization suggestions based on your specific hardware.
+### 3.3 Disk Encryption Setup
 
-### 3.3 Partition Encryption Options
+For enhanced security, you can encrypt sensitive partitions:
 
-For enhanced security, Omakub supports disk encryption:
-
-1. **Full Disk Encryption**:
-   - Select "Enable Encryption" in the partition manager
-   - Choose a strong passphrase when prompted
-   - Note: The `/boot` partition remains unencrypted
+1. **Full LUKS Encryption** (apply before formatting):
+   ```bash
+   # Encrypt the root partition
+   sudo cryptsetup luksFormat /dev/sda3
+   
+   # Open the encrypted partition
+   sudo cryptsetup open /dev/sda3 cryptroot
+   
+   # Format the opened LUKS container
+   sudo mkfs.ext4 -L root /dev/mapper/cryptroot
+   
+   # Mount for installation
+   sudo mount /dev/mapper/cryptroot /mnt
+   ```
 
 2. **Selective Partition Encryption**:
-   - In advanced mode, you can selectively encrypt partitions:
    ```bash
-   omakub-disk-manager --encrypt /var/lib/docker
-   omakub-disk-manager --encrypt /var/lib/rancher
+   # Encrypt Docker storage
+   sudo cryptsetup luksFormat /dev/sda5
+   sudo cryptsetup open /dev/sda5 cryptdocker
+   sudo mkfs.ext4 -L docker /dev/mapper/cryptdocker
+   sudo mount /dev/mapper/cryptdocker /mnt/var/lib/docker
+   
+   # Encrypt K3s data
+   sudo cryptsetup luksFormat /dev/sda6
+   sudo cryptsetup open /dev/sda6 cryptk3s
+   sudo mkfs.ext4 -L k3s /dev/mapper/cryptk3s
+   sudo mount /dev/mapper/cryptk3s /mnt/var/lib/rancher
    ```
 
 3. **Performance Considerations**:
@@ -196,11 +293,22 @@ For enhanced security, Omakub supports disk encryption:
    - Modern CPUs with AES-NI support minimize this impact on SSDs
    - For optimal performance, consider encrypting only sensitive partitions
 
+4. **Configure crypttab** (if using encryption):
+   ```bash
+   # Create crypttab file
+   sudo bash -c 'echo "# /etc/crypttab: mappings for encrypted partitions" > /mnt/etc/crypttab'
+   
+   # Add entries for encrypted partitions
+   echo "cryptroot UUID=$(sudo blkid -s UUID -o value /dev/sda3) none luks" | sudo tee -a /mnt/etc/crypttab
+   echo "cryptdocker UUID=$(sudo blkid -s UUID -o value /dev/sda5) none luks" | sudo tee -a /mnt/etc/crypttab
+   echo "cryptk3s UUID=$(sudo blkid -s UUID -o value /dev/sda6) none luks" | sudo tee -a /mnt/etc/crypttab
+   ```
+
 Continue with the installation process after completing the partitioning.
 
 ### 3.4 Modern Partitioning for Beelink SER8
 
-The Beelink SER8 typically comes with NVMe storage and 24GB of RAM, which requires specific partitioning approaches. Here's how to create the optimized partition layout using standard Linux tools:
+The Beelink SER8 typically comes with NVMe storage (1TB in this configuration) and 24GB of RAM, which requires specific partitioning approaches. Here's how to create the optimized partition layout using standard Linux tools:
 
 #### Using parted for Modern NVMe Partitioning
 
@@ -219,32 +327,32 @@ The Beelink SER8 typically comes with NVMe storage and 24GB of RAM, which requir
    sudo parted /dev/nvme0n1 mklabel gpt
    ```
 
-4. **Create the partitions using parted** (adjusted for SER8's 24GB RAM):
+4. **Create the partitions using parted** (adjusted for SER8's 1TB NVMe and 24GB RAM):
    ```bash
    # Create EFI partition
    sudo parted -a optimal /dev/nvme0n1 mkpart "EFI" fat32 0% 512MiB
    sudo parted /dev/nvme0n1 set 1 esp on
    
    # Create boot partition
-   sudo parted -a optimal /dev/nvme0n1 mkpart "boot" ext4 512MiB 1.5GiB
+   sudo parted -a optimal /dev/nvme0n1 mkpart "boot" ext4 512MiB 2GiB
    
    # Create root partition
-   sudo parted -a optimal /dev/nvme0n1 mkpart "root" ext4 1.5GiB 41.5GiB
+   sudo parted -a optimal /dev/nvme0n1 mkpart "root" ext4 2GiB 82GiB
    
    # Create var partition
-   sudo parted -a optimal /dev/nvme0n1 mkpart "var" ext4 41.5GiB 71.5GiB
+   sudo parted -a optimal /dev/nvme0n1 mkpart "var" ext4 82GiB 152GiB
    
-   # Create docker storage partition (adjust size based on your NVMe capacity)
-   sudo parted -a optimal /dev/nvme0n1 mkpart "docker" ext4 71.5GiB 151.5GiB
+   # Create docker storage partition (larger for container images)
+   sudo parted -a optimal /dev/nvme0n1 mkpart "docker" ext4 152GiB 552GiB
    
-   # Create k3s data partition
-   sudo parted -a optimal /dev/nvme0n1 mkpart "k3s" ext4 151.5GiB 191.5GiB
+   # Create k3s data partition (larger for Kubernetes workloads)
+   sudo parted -a optimal /dev/nvme0n1 mkpart "k3s" ext4 552GiB 988GiB
    
    # Create swap partition (adjusted for 24GB RAM - using 12GB)
-   sudo parted -a optimal /dev/nvme0n1 mkpart "swap" linux-swap 191.5GiB 203.5GiB
+   sudo parted -a optimal /dev/nvme0n1 mkpart "swap" linux-swap 988GiB 100%
    ```
 
-   > **Note about swap size**: For Kubernetes workloads on a system with 24GB RAM, we're using a 12GB swap (half the RAM) which is appropriate for the SER8. This provides sufficient memory for Kubernetes operations while avoiding excessive disk usage.
+   > **Note about partition sizes**: With a 1TB NVMe drive, we allocate more space to Docker (400GB) and K3s (436GB) partitions to accommodate large container images and Kubernetes workloads. The swap is sized to 12GB (half of RAM) which is appropriate for the SER8's 24GB RAM.
 
 5. **Verify the partition layout**:
    ```bash
@@ -338,33 +446,6 @@ After installation, apply these optimizations specifically designed for the Beel
    # Optimize swap performance
    echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.d/99-sysctl.conf
    ```
-
-#### Partitioning Verification
-
-To verify your partitioning is optimal for Kubernetes on the SER8:
-
-```bash
-# Check partition alignment (should be 0 for all)
-sudo blockdev --getalignoff /dev/nvme0n1p{1..7}
-
-# Check partition table
-sudo fdisk -l /dev/nvme0n1
-
-# Check mount options
-findmnt -t ext4,vfat
-
-# Verify I/O scheduler
-cat /sys/block/nvme0n1/queue/scheduler
-
-# Check filesystem features
-sudo tune2fs -l /dev/nvme0n1p5 | grep "Filesystem features"
-
-# Verify swap configuration
-free -h
-cat /proc/sys/vm/swappiness
-```
-
-This configuration is tailored for the Beelink SER8's specific hardware - NVMe storage and 24GB RAM - ensuring optimal performance for Kubernetes and container workloads.
 
 ## 4. Setting Up a User on Ser8
 
