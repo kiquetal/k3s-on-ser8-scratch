@@ -2,6 +2,8 @@
 
 This directory contains Ansible playbooks and roles for setting up K3s and Docker on your Ser8 device running Omakub OS. The setup allows for remote Docker usage from IntelliJ IDEA.
 
+> **Important**: These Ansible playbooks are designed to be run **from your local workstation or control machine**, not on the Ser8 itself. Ansible will remotely configure the Ser8 using SSH.
+
 ## Directory Structure
 
 ```
@@ -17,47 +19,64 @@ ansible/
 
 ## Prerequisites
 
-1. Ansible installed on your control machine:
+1. Ansible installed on your **control machine** (your laptop/desktop):
    ```bash
-   # For Omakub OS / Debian-based systems
+   # For Debian-based systems
    sudo apt update
    sudo apt install ansible
 
    # For macOS (using Homebrew)
    brew install ansible
+
+   # For Windows
+   # Use WSL2 with Ubuntu or use pip in a Python environment
+   pip install ansible
    ```
 
-2. SSH access to your Ser8 device configured as described in the main README.md
-   (Omakub OS uses OpenSSH server with the same configuration approach as described)
+2. SSH access configured from your control machine to your Ser8 device:
+   - SSH key-based authentication must be set up as described in the main README.md
+   - Your control machine must have the private SSH key that corresponds to the public key installed on Ser8
+   - This is required because Ansible uses SSH to connect to and configure the remote Ser8
+
+## Execution Model
+
+These playbooks follow the standard Ansible "push" model:
+
+1. You run Ansible commands from your **local workstation/laptop**
+2. Ansible connects to the Ser8 via SSH
+3. Configuration is pushed to the Ser8 through this connection
+4. No Ansible installation is required on the Ser8 itself
 
 ## Setup Instructions
 
 ### 1. Configure the Inventory
 
-Edit the `inventory.yml` file to match your Ser8 device's IP address or hostname:
+Edit the `inventory.yml` file on your control machine to match your Ser8 device's IP address or hostname:
 
 ```yaml
 all:
   hosts:
     ser8:
-      ansible_host: your_ser8_ip_or_hostname
-      ansible_user: k3sadmin
-      ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+      ansible_host: your_ser8_ip_or_hostname  # Replace with actual IP/hostname
+      ansible_user: k3sadmin                  # User created during Ser8 setup
+      ansible_ssh_private_key_file: ~/.ssh/id_ed25519  # Path to your SSH private key
 ```
 
-### 2. Run the Playbook
+The `ansible_ssh_private_key_file` must point to the private key on your control machine that corresponds to the public key you added to the Ser8's `~/.ssh/authorized_keys` file during setup.
 
-Execute the main playbook to install and configure K3s and Docker:
+### 2. Run the Playbook From Your Control Machine
+
+Execute the main playbook from your local workstation:
 
 ```bash
 ansible-playbook -i inventory.yml k3s-docker-setup.yml
 ```
 
 This playbook will:
-- Install K3s as a single-node Kubernetes cluster on Omakub OS
+- Install K3s as a single-node Kubernetes cluster on the Ser8
 - Install Docker and configure it for remote access
 - Set up TLS certificates for secure Docker remote connections
-- Configure necessary firewall rules for Omakub OS
+- Configure necessary firewall rules
 
 ### 3. Connect IntelliJ IDEA to Remote Docker
 
