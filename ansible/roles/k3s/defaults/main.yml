@@ -6,8 +6,12 @@ k3s_server_args:
   - "--disable=traefik"
   - "--disable=servicelb"
   - "--tls-san={{ ansible_host }}"
+  - "--data-dir=/var/lib/rancher/k3s"  # Explicitly set to use our dedicated partition
 k3s_install_dir: "/usr/local/bin"
 k3s_kubeconfig_path: "/etc/rancher/k3s/k3s.yaml"
 k3s_kubeconfig_mode: "0644"  # Allows non-root access
 k3s_use_docker: true
+k3s_data_dir: "/var/lib/rancher/k3s"  # Matches our partition mount point
 
+# Verify data directory is properly mounted before installation
+k3s_verify_mounts: true

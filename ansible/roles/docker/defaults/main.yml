@@ -12,5 +12,7 @@ docker_daemon_options:
   tlscacert: "/etc/docker/ca.pem"
   tlscert: "/etc/docker/server-cert.pem"
   tlskey: "/etc/docker/server-key.pem"
+  data-root: "/var/lib/docker"  # Explicitly set to use our dedicated partition
 docker_insecure_registries: []
-
+docker_storage_driver: "overlay2"
+docker_verify_mounts: true  # Verify that /var/lib/docker is properly mounted

@@ -1,4 +1,15 @@
 ---
+- name: Check if /var/lib/rancher is properly mounted
+  ansible.builtin.shell: findmnt /var/lib/rancher
+  register: rancher_mount_check
+  failed_when: rancher_mount_check.rc != 0 and k3s_verify_mounts
+  changed_when: false
+
+- name: Verify dedicated partition for K3s
+  ansible.builtin.debug:
+    msg: "Verified that /var/lib/rancher is properly mounted on a dedicated partition"
+  when: rancher_mount_check.rc == 0
+
 - name: Download K3s installation script
   get_url:
     url: https://get.k3s.io
