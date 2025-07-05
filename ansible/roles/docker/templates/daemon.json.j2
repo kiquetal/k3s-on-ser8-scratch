@@ -7,6 +7,7 @@
   "tlsverify": {{ docker_daemon_options.tlsverify | to_json }},
   "tlscacert": "{{ docker_daemon_options.tlscacert }}",
   "tlscert": "{{ docker_daemon_options.tlscert }}",
-  "tlskey": "{{ docker_daemon_options.tlskey }}"
+  "tlskey": "{{ docker_daemon_options.tlskey }}",
+  "data-root": "{{ docker_daemon_options.data-root | default('/var/lib/docker') }}",
+  "storage-driver": "{{ docker_storage_driver | default('overlay2') }}"
 }
-
