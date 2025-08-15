@@ -19,24 +19,63 @@ ansible/
 
 ## Prerequisites
 
-1. Ansible installed on your **control machine** (your laptop/desktop):
-   ```bash
-   # For Debian-based systems
-   sudo apt update
-   sudo apt install ansible
+Before running the playbook, ensure you have the following set up:
 
-   # For macOS (using Homebrew)
-   brew install ansible
+### 1. User and SSH Access on the SER8
 
-   # For Windows
-   # Use WSL2 with Ubuntu or use pip in a Python environment
-   pip install ansible
-   ```
+The playbook is designed to connect to your SER8 as the `k3sadmin` user. You'll need to create this user on the SER8 after installing Omakub OS.
 
-2. SSH access configured from your control machine to your Ser8 device:
-   - SSH key-based authentication must be set up as described in the main README.md
-   - Your control machine must have the private SSH key that corresponds to the public key installed on Ser8
-   - This is required because Ansible uses SSH to connect to and configure the remote Ser8
+1.  **Create the new user:**
+    ```bash
+    sudo adduser k3sadmin
+    ```
+
+2.  **Add the user to the `sudo` group:**
+    ```bash
+    sudo usermod -aG sudo k3sadmin
+    ```
+
+3.  **Switch to the new user to set up SSH:**
+    ```bash
+    su - k3sadmin
+    ```
+
+4.  **Create the `.ssh` directory and `authorized_keys` file:**
+    ```bash
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    touch ~/.ssh/authorized_keys
+    chmod 600 ~/.ssh/authorized_keys
+    ```
+
+5.  **Copy your public SSH key to the SER8:**
+    From your local machine, use `ssh-copy-id` to copy your public key to the new user on the SER8.
+    ```bash
+    ssh-copy-id k3sadmin@your_ser8_ip_or_hostname
+    ```
+
+### 2. Ansible on Your Local Machine
+
+You need to install Ansible on the computer you'll be using to run the playbook (your laptop or desktop), not on the SER8.
+
+*   **For Debian-based systems (like Ubuntu):**
+    ```bash
+    sudo apt update
+    sudo apt install ansible
+    ```
+
+*   **For other Linux distributions (using `pip`):**
+    ```bash
+    python3 -m pip install --user ansible
+    ```
+
+*   **For macOS (using Homebrew):**
+    ```bash
+    brew install ansible
+    ```
+
+*   **For Windows:**
+    It's recommended to use the Windows Subsystem for Linux (WSL2) and install Ansible within the Linux distribution.
 
 ## Execution Model
 
