@@ -561,3 +561,117 @@ If you encounter any issues during the setup process, check the following:
 - K3s logs: `sudo journalctl -u k3s`
 - Omakub logs: `sudo journalctl -u omakub`
 - Omakub system diagnostics: `sudo omakub-diag`
+
+## 7. Mounting a New NVMe Disk
+
+This section provides a modern, step-by-step guide to partitioning, formatting, and mounting a new NVMe disk on your system. These instructions are designed for recent Linux distributions and focus on simplicity and reliability.
+
+### 7.1. Identify the New NVMe Disk
+
+First, identify the device name of your new NVMe disk. You can use the `lsblk` command, which provides a clear overview of your block devices.
+
+```bash
+lsblk -o NAME,SIZE,MODEL,TRAN
+```
+
+Look for a device that is not yet mounted, often named `/dev/nvme1n1` if you already have one NVMe drive.
+
+### 7.2. Partition the Disk with `parted`
+
+We will use `parted` to create a single partition that spans the entire disk. This is a common scenario for a data disk.
+
+1.  **Create a new GPT partition table:**
+
+    ```bash
+    sudo parted /dev/nvme1n1 mklabel gpt
+    ```
+
+2.  **Create a single partition using 100% of the disk space:**
+
+    ```bash
+    sudo parted -a optimal /dev/nvme1n1 mkpart primary ext4 0% 100%
+    ```
+
+3.  **Verify the new partition:**
+
+    ```bash
+    sudo parted /dev/nvme1n1 print
+    ```
+
+    You should see a single partition (e.g., `/dev/nvme1n1p1`).
+
+### 7.3. Format the Partition
+
+Format the newly created partition with the `ext4` filesystem. Using a label is a good practice for easy identification.
+
+```bash
+sudo mkfs.ext4 -L data /dev/nvme1n1p1
+```
+
+### 7.4. Mount the Disk
+
+1.  **Create a mount point:** This is the directory where the contents of the disk will be accessible.
+
+    ```bash
+    sudo mkdir -p /mnt/data
+    ```
+
+2.  **Mount the disk temporarily:**
+
+    ```bash
+    sudo mount /dev/nvme1n1p1 /mnt/data
+    ```
+
+3.  **Verify that the disk is mounted:**
+
+    ```bash
+    df -h /mnt/data
+    ```
+
+### 7.5. Make the Mount Persistent with `fstab`
+
+To ensure the disk is automatically mounted at boot, you need to add an entry to `/etc/fstab`. Using the partition's `UUID` is the most reliable method.
+
+1.  **Get the UUID of the partition:**
+
+    ```bash
+    sudo blkid -s UUID -o value /dev/nvme1n1p1
+    ```
+
+2.  **Add the entry to `/etc/fstab`:**
+
+    Open `/etc/fstab` with a text editor like `nano` or `vim`.
+
+    ```bash
+    sudo nano /etc/fstab
+    ```
+
+    Add the following line to the end of the file, replacing `YOUR_UUID_HERE` with the actual UUID from the previous command.
+
+    ```
+    UUID=YOUR_UUID_HERE /mnt/data ext4 defaults,noatime,discard=async 0 2
+    ```
+
+    **fstab options explained:**
+    *   `defaults`: A standard set of mount options (rw, suid, dev, exec, auto, nouser, async).
+    *   `noatime`: Disables writing file access times, which can improve performance on SSDs/NVMe.
+    *   `discard=async`: Enables continuous TRIM operations, which is beneficial for NVMe drive longevity and performance.
+    *   `0`: This field is used by `dump` and should be `0` for non-root filesystems.
+    *   `2`: This field is used by `fsck` to determine the order of file system checks at boot time. `2` is appropriate for data partitions.
+
+3.  **Test the `fstab` configuration:**
+
+    Unmount the disk and then use `mount -a` to mount all filesystems listed in `/etc/fstab`.
+
+    ```bash
+    sudo umount /mnt/data
+    sudo mount -a
+    ```
+
+4.  **Verify the mount again:**
+
+    ```bash
+    df -h /mnt/data
+    ```
+
+    If the command executes without errors and you see the disk mounted, your setup is complete and will persist across reboots.
